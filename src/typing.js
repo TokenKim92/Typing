@@ -36,7 +36,7 @@ export default class Typing extends BaseCanvas {
   #isTabAtEnd = true;
   #tailText;
 
-  constructor(fontFormat, speed = 100) {
+  constructor(fontFormat, speed = 50) {
     super(true);
 
     this.#fontFormat = fontFormat;
@@ -56,8 +56,6 @@ export default class Typing extends BaseCanvas {
 
     this.ctx.textBaseline = 'top';
     this.ctx.font = this.#fontFormat.font;
-
-    this.type(['This is a great string.', 'But here is a better one.']);
   }
 
   animate(curTime) {
@@ -76,14 +74,17 @@ export default class Typing extends BaseCanvas {
 
   type(text) {
     this.#msgList.push({ msg: Typing.TYPE, data: text });
+    return this;
   }
 
   move(index) {
     this.#msgList.push({ msg: Typing.MOVE, data: index });
+    return this;
   }
 
   delete(count) {
     this.#msgList.push({ msg: Typing.DELETE, data: count });
+    return this;
   }
 
   #initMsgHandle() {
@@ -117,15 +118,19 @@ export default class Typing extends BaseCanvas {
     const index = this.#tailText.indexOf('\n');
     index === -1 || (this.#tailText = this.#tailText.slice(0, index));
 
-    this.#initCharPosList();
+    this.#initCharPosList(0);
   }
 
-  #initCharPosList() {
-    this.#charPosList = [];
-    let pos = { ...this.#orgPos };
+  #initCharPosList(startIndex) {
+    this.#charPosList.splice(startIndex, this.#charPosList.length - startIndex);
+
+    let pos =
+      startIndex === 0
+        ? { ...this.#orgPos }
+        : { ...this.#charPosList[startIndex - 1] };
     this.#charPosList.push({ ...pos });
 
-    for (let i = 0; i < this.#text.length; i++) {
+    for (let i = startIndex; i < this.#text.length; i++) {
       const character = this.#text[i];
       pos = character === '\n'
               ? this.#calculateNewLinePos(pos)
@@ -146,7 +151,13 @@ export default class Typing extends BaseCanvas {
     this.#isTabAtEnd = false;
   }
 
-  #setDeleteData(count) {}
+  #setDeleteData(count) {
+    this.#targetIndex += count;
+    this.#targetIndex > this.#text.length &&
+      (this.#targetIndex = this.#text.length);
+
+    this.#movingDirection = this.#curMSG.data < 0 ? Typing.BACK : Typing.FORWARD; // prettier-ignore
+  }
 
   #typing() {
     const pos = this.#charPosList[this.#curIndex];
@@ -170,19 +181,30 @@ export default class Typing extends BaseCanvas {
     this.#clearTap(pos);
 
     this.#curIndex += this.#movingDirection;
-    // if (this.#curIndex < 0) {
-    //   this.#curIndex = 0;
-    // } else if (this.#curIndex > this.#textLength) {
-    //   this.#curIndex = this.#textLength;
-    // }
-
     const nextPos = this.#charPosList[this.#curIndex];
     this.#drawTap(nextPos);
-    console.log(this.#movingDirection, this.#curIndex, this.#targetIndex);
+
     this.#isLastCharacter && (this.#curMSG = { msg: Typing.INIT, data: null });
   }
 
-  #deleting() {}
+  #deleting() {
+    const pos = this.#charPosList[this.#curIndex];
+    this.#clearTap(pos);
+    this.#clearTailText();
+
+    this.#tailText = this.#text.slice(this.#curIndex + 1);
+    this.#text = this.#text.slice(0, this.#curIndex) + this.#tailText;
+
+    this.#initCharPosList(this.#curIndex + 1);
+
+    this.ctx.fillText(this.#tailText, pos.x, pos.y);
+
+    this.#targetIndex -= this.#movingDirection;
+    const nextPos = this.#charPosList[this.#curIndex];
+    this.#drawTap(nextPos);
+
+    this.#isLastCharacter && (this.#curMSG = { msg: Typing.INIT, data: null });
+  }
 
   #tapping(curTime) {
     const isOnTapToggleTime = Typing.TAB_TOGGLE_TIME < curTime - this.#prevTimeForTab; //prettier-ignore

@@ -2,7 +2,18 @@ import Typing from './src/typing.js';
 import FontFormat from './lib/fontFormat.js';
 
 window.onload = () => {
-  new AppBuilder().fontName(new FontFormat(50, 50, 'Arial')).speed(500).build();
+  const app = new AppBuilder()
+    .fontName(new FontFormat(50, 50, 'Arial'))
+    .speed(500)
+    .build();
+
+  app
+    .type('Hello, I am Token Kim.')
+    .move(-10)
+    .delete(5)
+    .type('Deokgeun')
+    .move(5)
+    .type(['', 'A Software Engineer currently residing in Dresden, Germany.']);
 };
 
 class AppBuilder {
