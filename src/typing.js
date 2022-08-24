@@ -19,17 +19,22 @@ export default class Typing extends BaseCanvas {
   #prevTimeForTab = 0;
   #prevMSGTime = 0;
   #tapToggle = true;
-  #orgPosX = 0;
-  #pos = {
+  #orgPos = {
     x: 0,
     y: 0,
   };
-  #text;
+  #tabPos = {
+    x: 0,
+    y: 0,
+  };
+  #text = '';
   #charPosList = [];
   #curIndex = 0;
   #targetIndex = 0;
   #msgHandler = this.#tapping;
   #movingDirection = 0;
+  #isTabAtEnd = true;
+  #tailText;
 
   constructor(fontFormat, speed = 100) {
     super(true);
@@ -38,12 +43,12 @@ export default class Typing extends BaseCanvas {
     this.#speed = speed;
 
     this.setStartPos(10, 10);
-    this.#charPosList.push(this.#pos);
+    this.#charPosList.push(this.#tabPos);
   }
 
   setStartPos(x, y) {
-    this.#orgPosX = x;
-    this.#pos = { x, y };
+    this.#orgPos = { x, y };
+    this.#tabPos = { x, y };
   }
 
   resize() {
@@ -52,8 +57,7 @@ export default class Typing extends BaseCanvas {
     this.ctx.textBaseline = 'top';
     this.ctx.font = this.#fontFormat.font;
 
-    this.type(['hello', 'Hi']);
-    this.move(-3);
+    this.type(['This is a great string.', 'But here is a better one.']);
   }
 
   animate(curTime) {
@@ -100,55 +104,81 @@ export default class Typing extends BaseCanvas {
   }
 
   #setTypeData(text) {
-    if (text.constructor !== Array) {
-      this.#text = text;
-      this.#targetIndex = text.length;
-      return;
-    }
+    const toBeAddedText =
+      text.constructor !== Array
+        ? text
+        : text.reduce((totalText, textLine, index) => (totalText += index !== text.length - 1 ? textLine + '\n' : textLine), ''); // prettier-ignore
 
-    let initText = '';
-    text.forEach((textLine, index) => (initText += index !== text.length - 1 ? textLine + '\n' : textLine)); //prettier-ignore
-    this.#text = initText;
-    this.#targetIndex = initText.length;
+    const headText = this.#text.slice(0, this.#curIndex);
+    this.#tailText = this.#text.slice(this.#curIndex);
+    this.#text = headText + toBeAddedText + this.#tailText;
+    this.#targetIndex = this.#curIndex + toBeAddedText.length;
+
+    const index = this.#tailText.indexOf('\n');
+    index === -1 || (this.#tailText = this.#tailText.slice(0, index));
+
+    this.#initCharPosList();
+  }
+
+  #initCharPosList() {
+    this.#charPosList = [];
+    let pos = { ...this.#orgPos };
+    this.#charPosList.push({ ...pos });
+
+    for (let i = 0; i < this.#text.length; i++) {
+      const character = this.#text[i];
+      pos = character === '\n'
+              ? this.#calculateNewLinePos(pos)
+              : { x: (pos.x += this.ctx.measureText(character).width), y: pos.y }; // prettier-ignore
+      this.#charPosList.push({ ...pos });
+    }
+  }
+
+  #calculateNewLinePos(pos) {
+    return { x: this.#orgPos.x, y: pos.y + this.#fontFormat.size };
   }
 
   #setMoveData(index) {
     this.#targetIndex += index;
     this.#movingDirection = this.#curMSG.data < 0 ? Typing.BACK : Typing.FORWARD; // prettier-ignore
+
+    // TODO :: set again if tab is at the end
+    this.#isTabAtEnd = false;
   }
 
   #setDeleteData(count) {}
 
   #typing() {
-    this.#clearTap();
-    const character = this.#text[this.#curIndex++];
-    if (character === '\n') {
-      this.#lineBreak();
-      this.#charPosList.push({ x: this.#pos.x, y: this.#pos.y });
-      return;
-    }
+    const pos = this.#charPosList[this.#curIndex];
+    this.#clearTap(pos);
+    this.#isTabAtEnd || this.#clearTailText();
 
-    this.ctx.fillText(character, this.#pos.x, this.#pos.y);
-    const fontWidth = this.ctx.measureText(character).width;
-    this.#pos.x += fontWidth;
-    this.#charPosList.push({ x: this.#pos.x, y: this.#pos.y });
-    this.#drawTap();
+    const character = this.#text[this.#curIndex];
+    const text = this.#isTabAtEnd ? character : character + this.#tailText;
 
+    this.ctx.fillText(text, pos.x, pos.y);
+
+    const nextPos = this.#charPosList[this.#curIndex + 1];
+    this.#drawTap(nextPos);
+
+    this.#curIndex++;
     this.#isLastCharacter && (this.#curMSG = { msg: Typing.INIT, data: null });
   }
 
   #moving(index) {
+    const pos = this.#charPosList[this.#curIndex];
+    this.#clearTap(pos);
+
     this.#curIndex += this.#movingDirection;
-    if (this.#curIndex < 0) {
-      this.#curIndex = 0;
-    } else if (this.#curIndex > this.#textLength - 1) {
-      this.#curIndex = this.#textLength - 1;
-    }
+    // if (this.#curIndex < 0) {
+    //   this.#curIndex = 0;
+    // } else if (this.#curIndex > this.#textLength) {
+    //   this.#curIndex = this.#textLength;
+    // }
 
-    this.#clearTap();
-    this.#pos = this.#charPosList[this.#curIndex];
-    this.#drawTap();
-
+    const nextPos = this.#charPosList[this.#curIndex];
+    this.#drawTap(nextPos);
+    console.log(this.#movingDirection, this.#curIndex, this.#targetIndex);
     this.#isLastCharacter && (this.#curMSG = { msg: Typing.INIT, data: null });
   }
 
@@ -158,42 +188,57 @@ export default class Typing extends BaseCanvas {
     const isOnTapToggleTime = Typing.TAB_TOGGLE_TIME < curTime - this.#prevTimeForTab; //prettier-ignore
     if (isOnTapToggleTime) {
       if (this.#isLastCharacter) {
-        this.#tapToggle ? this.#drawTap() : this.#clearTap();
+        const pos = this.#charPosList[this.#curIndex];
+        this.#tapToggle ? this.#drawTap(pos) : this.#clearTap(pos);
         this.#tapToggle = !this.#tapToggle;
       }
       this.#prevTimeForTab = curTime;
     }
   }
 
-  #lineBreak() {
-    this.#pos.x = this.#orgPosX;
-    this.#pos.y += this.#fontFormat.size;
-  }
-
-  #drawTap() {
+  #drawTap(pos) {
     this.ctx.save();
     this.ctx.imageSmoothingEnabled = false;
     this.ctx.fillStyle = '#000000';
     this.ctx.fillRect(
-      this.#pos.x,
-      this.#pos.y,
+      pos.x,
+      pos.y,
       Typing.TAB_THICKNESS,
       this.#fontFormat.size
     );
     this.ctx.restore();
   }
 
-  #clearTap() {
+  #clearTap(pos) {
     this.ctx.clearRect(
-      this.#pos.x - 1,
-      this.#pos.y,
+      pos.x - 1,
+      pos.y,
       Typing.TAB_THICKNESS + 2,
       this.#fontFormat.size
     );
   }
 
-  get #textLength() {
-    return this.#text ? this.#text.length : 0;
+  #clearTailText() {
+    const startPos = this.#charPosList[this.#curIndex];
+    const endPos = this.#charPosList[this.#lastIndexInLine];
+
+    this.clearRect(
+      startPos.x,
+      startPos.y,
+      endPos.x,
+      endPos.y + this.#fontFormat.size
+    );
+  }
+
+  get #lastIndexInLine() {
+    let i;
+    for (i = this.#targetIndex; i < this.#text.length; i++) {
+      if (this.#text[i] === '\n') {
+        break;
+      }
+    }
+    i === this.#charPosList.length && i--;
+    return i;
   }
 
   get #isLastCharacter() {
