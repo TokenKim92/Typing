@@ -8,12 +8,19 @@ window.onload = () => {
     .build();
 
   app
-    .type('Hello, I am Token Kim.')
-    .move(-10)
-    .delete(5)
-    .type('Deokgeun')
-    .move(5)
-    .type(['', 'A Software Engineer currently residing in Dresden, Germany.']);
+    .type('the mot versti')
+    .move(-8)
+    .type('s')
+    .moveFront()
+    .delete(1)
+    .type('T')
+    .move(12)
+    .type('a')
+    .moveEnd()
+    .type('le typing utlity')
+    .move(-4)
+    .type('i')
+    .move(4);
 };
 
 class AppBuilder {

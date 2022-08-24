@@ -82,6 +82,16 @@ export default class Typing extends BaseCanvas {
     return this;
   }
 
+  moveFront() {
+    this.#msgList.push({ msg: Typing.MOVE, data: Number.MIN_SAFE_INTEGER });
+    return this;
+  }
+
+  moveEnd() {
+    this.#msgList.push({ msg: Typing.MOVE, data: Number.MAX_SAFE_INTEGER });
+    return this;
+  }
+
   delete(count) {
     this.#msgList.push({ msg: Typing.DELETE, data: count });
     return this;
@@ -134,7 +144,10 @@ export default class Typing extends BaseCanvas {
       const character = this.#text[i];
       pos = character === '\n'
               ? this.#calculateNewLinePos(pos)
-              : { x: (pos.x += this.ctx.measureText(character).width), y: pos.y }; // prettier-ignore
+              : { 
+                  x: pos.x += this.ctx.measureText(character).width, 
+                  y: pos.y 
+                }; // prettier-ignore
       this.#charPosList.push({ ...pos });
     }
   }
@@ -145,16 +158,17 @@ export default class Typing extends BaseCanvas {
 
   #setMoveData(index) {
     this.#targetIndex += index;
-    this.#movingDirection = this.#curMSG.data < 0 ? Typing.BACK : Typing.FORWARD; // prettier-ignore
+    this.#targetIndex > this.#text.length && (this.#targetIndex = this.#text.length); // prettier-ignore
+    this.#targetIndex < 0 && (this.#targetIndex = 0);
 
+    this.#movingDirection = this.#curMSG.data < 0 ? Typing.BACK : Typing.FORWARD; // prettier-ignore
     // TODO :: set again if tab is at the end
     this.#isTabAtEnd = false;
   }
 
   #setDeleteData(count) {
     this.#targetIndex += count;
-    this.#targetIndex > this.#text.length &&
-      (this.#targetIndex = this.#text.length);
+    this.#targetIndex > this.#text.length && (this.#targetIndex = this.#text.length); // prettier-ignore
 
     this.#movingDirection = this.#curMSG.data < 0 ? Typing.BACK : Typing.FORWARD; // prettier-ignore
   }
