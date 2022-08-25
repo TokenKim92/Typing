@@ -1,27 +1,39 @@
 import Typing from './src/typing.js';
 import FontFormat from './lib/fontFormat.js';
 
-window.onload = () => {
-  const app = new AppBuilder()
-    .fontName(new FontFormat(20, 50, 'Arial'))
-    .speed(500)
-    .build();
+WebFont.load({
+  google: { families: ['Fjalla One'] },
+  fontactive: () => {
+    const app = new AppBuilder()
+      .fontName(new FontFormat(400, 50, 'Fjalla One', 'white'))
+      .speed(500)
+      .build();
 
-  app
-    .type('the mot versti', 300)
-    .move(-8, 100)
-    .type('s', 400)
-    .moveFront(300)
-    .delete(1, 100)
-    .type('T', 225)
-    .move(12, 200)
-    .type('a', 350)
-    .moveEnd(150)
-    .type('le typing utlity')
-    .move(-4)
-    .type('i')
-    .move(4);
-};
+    app
+      .delay(1000)
+      .type('Hi', 200)
+      .move(-1, 100)
+      .delete(1, 100)
+      .type('ello,', 200)
+      .type(' I am Token Kim.', 200)
+      .move(-10, 100)
+      .delete(5, 100)
+      .type('Deokgeun', 100)
+      .moveEnd(200)
+      .type(['', 'A Software Engineer of C/C++'], 200)
+      .move(-8, 100)
+      .delete(8, 10)
+      .type('currently residing in Germany.', 200)
+      .move(-8, 100)
+      .type('Dresden, ', 200)
+      .moveEnd(200)
+      .type(['', "It's my portfolio of HTML5"], 200)
+      .move(-5, 100)
+      .type('interactive ', 200)
+      .moveEnd(100)
+      .type([' without library.', 'Please enjoy this.'], 50);
+  },
+});
 
 class AppBuilder {
   #app;
