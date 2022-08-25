@@ -2,7 +2,7 @@ import BaseCanvas from '../lib/baseCanvas.js';
 
 export default class Typing extends BaseCanvas {
   static TAB_TOGGLE_TIME = 600;
-  static TAB_THICKNESS = 2;
+  static TAB_THICKNESS = 1;
   static LINE_BREAK = -1;
   static BACK = -1;
   static FORWARD = 1;
@@ -11,19 +11,17 @@ export default class Typing extends BaseCanvas {
   static TYPE = 1;
   static MOVE = 2;
   static DELETE = 3;
+  static DELAY = 4;
 
   #curMSG = { msg: Typing.INIT, data: null };
   #msgList = [];
   #fontFormat;
   #speed;
-  #prevTimeForTab = 0;
+  #curTime = 0;
+  #prevWaitingTime = 0;
   #prevMSGTime = 0;
   #tapToggle = true;
   #orgPos = {
-    x: 0,
-    y: 0,
-  };
-  #tabPos = {
     x: 0,
     y: 0,
   };
@@ -31,10 +29,11 @@ export default class Typing extends BaseCanvas {
   #charPosList = [];
   #curIndex = 0;
   #targetIndex = 0;
-  #msgHandler = this.#tapping;
+  #msgHandler = this.#tabToggling;
   #movingDirection = 0;
   #isTabAtEnd = true;
   #tailText;
+  #delayTime;
 
   constructor(fontFormat, speed = 50) {
     super(true);
@@ -43,12 +42,10 @@ export default class Typing extends BaseCanvas {
     this.#speed = speed;
 
     this.setStartPos(10, 10);
-    this.#charPosList.push(this.#tabPos);
   }
 
   setStartPos(x, y) {
     this.#orgPos = { x, y };
-    this.#tabPos = { x, y };
   }
 
   resize() {
@@ -59,41 +56,62 @@ export default class Typing extends BaseCanvas {
   }
 
   animate(curTime) {
+    this.#curTime = curTime;
+
     if (this.#curMSG.msg === Typing.INIT) {
       this.#curMSG = this.#msgList.length !== 0 ? this.#msgList.shift() : this.#curMSG; //prettier-ignore
       this.#msgHandler = this.#initMsgHandle();
     }
 
-    const isOnMSGTime = this.#speed < curTime - this.#prevMSGTime; //prettier-ignore
-    if (isOnMSGTime) {
-      const data = this.#curMSG.msg === Typing.INIT ? curTime : this.#curMSG.data; //prettier-ignore
-      this.#msgHandler(data);
+    if (this.#isProcessMessage && this.#isMessageProcessTime) {
+      this.#msgHandler(this.#curMSG.data);
       this.#prevMSGTime = curTime;
+
+      return;
+    }
+
+    if (this.#isWaitingTime) {
+      this.#tabToggling();
+      this.#prevWaitingTime = this.#curTime;
+
+      if (this.#isDelayMessage && this.#isDoneDelay) {
+        this.#curMSG = { msg: Typing.INIT, data: null };
+      }
     }
   }
 
-  type(text) {
+  type(text, delayTime = 0) {
     this.#msgList.push({ msg: Typing.TYPE, data: text });
+    !!delayTime && this.#msgList.push({ msg: Typing.DELAY, data: delayTime }); // prettier-ignore
     return this;
   }
 
-  move(index) {
+  move(index, delayTime = 0) {
     this.#msgList.push({ msg: Typing.MOVE, data: index });
+    !!delayTime && this.#msgList.push({ msg: Typing.DELAY, data: delayTime }); // prettier-ignore
     return this;
   }
 
-  moveFront() {
+  moveFront(delayTime = 0) {
     this.#msgList.push({ msg: Typing.MOVE, data: Number.MIN_SAFE_INTEGER });
+    !!delayTime && this.#msgList.push({ msg: Typing.DELAY, data: delayTime }); // prettier-ignore
     return this;
   }
 
-  moveEnd() {
+  moveEnd(delayTime = 0) {
     this.#msgList.push({ msg: Typing.MOVE, data: Number.MAX_SAFE_INTEGER });
+    !!delayTime && this.#msgList.push({ msg: Typing.DELAY, data: delayTime }); // prettier-ignore
     return this;
   }
 
-  delete(count) {
+  delete(count, delayTime = 0) {
     this.#msgList.push({ msg: Typing.DELETE, data: count });
+    !!delayTime && this.#msgList.push({ msg: Typing.DELAY, data: delayTime }); // prettier-ignore
+    return this;
+  }
+
+  delay(time) {
+    this.#msgList.push({ msg: Typing.DELAY, data: time });
     return this;
   }
 
@@ -108,9 +126,11 @@ export default class Typing extends BaseCanvas {
       case Typing.DELETE:
         this.#setDeleteData(this.#curMSG.data);
         return this.#deleting;
+      case Typing.DELAY:
+        this.#setDelayData(this.#curMSG.data);
       case Typing.INIT:
       default:
-        return this.#tapping;
+        return this.#tabToggling;
     }
   }
 
@@ -128,6 +148,7 @@ export default class Typing extends BaseCanvas {
     const index = this.#tailText.indexOf('\n');
     index === -1 || (this.#tailText = this.#tailText.slice(0, index));
 
+    //TODO:: find right index
     this.#initCharPosList(0);
   }
 
@@ -173,6 +194,10 @@ export default class Typing extends BaseCanvas {
     this.#movingDirection = this.#curMSG.data < 0 ? Typing.BACK : Typing.FORWARD; // prettier-ignore
   }
 
+  #setDelayData(time) {
+    this.#delayTime = this.#curTime + time;
+  }
+
   #typing() {
     const pos = this.#charPosList[this.#curIndex];
     this.#clearTap(pos);
@@ -187,10 +212,10 @@ export default class Typing extends BaseCanvas {
     this.#drawTap(nextPos);
 
     this.#curIndex++;
-    this.#isLastCharacter && (this.#curMSG = { msg: Typing.INIT, data: null });
+    this.#isProcessDone && (this.#curMSG = { msg: Typing.INIT, data: null });
   }
 
-  #moving(index) {
+  #moving() {
     const pos = this.#charPosList[this.#curIndex];
     this.#clearTap(pos);
 
@@ -198,7 +223,7 @@ export default class Typing extends BaseCanvas {
     const nextPos = this.#charPosList[this.#curIndex];
     this.#drawTap(nextPos);
 
-    this.#isLastCharacter && (this.#curMSG = { msg: Typing.INIT, data: null });
+    this.#isProcessDone && (this.#curMSG = { msg: Typing.INIT, data: null });
   }
 
   #deleting() {
@@ -217,53 +242,32 @@ export default class Typing extends BaseCanvas {
     const nextPos = this.#charPosList[this.#curIndex];
     this.#drawTap(nextPos);
 
-    this.#isLastCharacter && (this.#curMSG = { msg: Typing.INIT, data: null });
+    this.#isProcessDone && (this.#curMSG = { msg: Typing.INIT, data: null });
   }
 
-  #tapping(curTime) {
-    const isOnTapToggleTime = Typing.TAB_TOGGLE_TIME < curTime - this.#prevTimeForTab; //prettier-ignore
-    if (isOnTapToggleTime) {
-      if (this.#isLastCharacter) {
-        const pos = this.#charPosList[this.#curIndex];
-        this.#tapToggle ? this.#drawTap(pos) : this.#clearTap(pos);
-        this.#tapToggle = !this.#tapToggle;
-      }
-      this.#prevTimeForTab = curTime;
-    }
+  #tabToggling() {
+    const pos = this.#charPosList[this.#curIndex];
+    this.#tapToggle ? this.#drawTap(pos) : this.#clearTap(pos);
+    this.#tapToggle = !this.#tapToggle;
   }
 
   #drawTap(pos) {
     this.ctx.save();
     this.ctx.imageSmoothingEnabled = false;
     this.ctx.fillStyle = '#000000';
-    this.ctx.fillRect(
-      pos.x,
-      pos.y,
-      Typing.TAB_THICKNESS,
-      this.#fontFormat.size
-    );
+    this.ctx.fillRect(pos.x, pos.y, Typing.TAB_THICKNESS, this.#fontFormat.size); //prettier-ignore
     this.ctx.restore();
   }
 
   #clearTap(pos) {
-    this.ctx.clearRect(
-      pos.x - 1,
-      pos.y,
-      Typing.TAB_THICKNESS + 2,
-      this.#fontFormat.size
-    );
+    this.ctx.clearRect(pos.x - 1, pos.y, Typing.TAB_THICKNESS + 2, this.#fontFormat.size); //prettier-ignore
   }
 
   #clearTailText() {
     const startPos = this.#charPosList[this.#curIndex];
     const endPos = this.#charPosList[this.#lastIndexInLine];
 
-    this.clearRect(
-      startPos.x,
-      startPos.y,
-      endPos.x,
-      endPos.y + this.#fontFormat.size
-    );
+    this.clearRect(startPos.x, startPos.y, endPos.x, endPos.y + this.#fontFormat.size); //prettier-ignore
   }
 
   get #lastIndexInLine() {
@@ -277,7 +281,27 @@ export default class Typing extends BaseCanvas {
     return i;
   }
 
-  get #isLastCharacter() {
+  get #isProcessDone() {
     return this.#curIndex === this.#targetIndex;
+  }
+
+  get #isMessageProcessTime() {
+    return this.#speed < this.#curTime - this.#prevMSGTime;
+  }
+
+  get #isWaitingTime() {
+    return Typing.TAB_TOGGLE_TIME < this.#curTime - this.#prevWaitingTime;
+  }
+
+  get #isProcessMessage() {
+    return this.#curMSG.msg !== Typing.INIT && this.#curMSG.msg !== Typing.DELAY; // prettier-ignore
+  }
+
+  get #isDelayMessage() {
+    return this.#curMSG.msg === Typing.DELAY;
+  }
+
+  get #isDoneDelay() {
+    return this.#delayTime < this.#curTime;
   }
 }
