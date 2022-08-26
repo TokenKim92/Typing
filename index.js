@@ -9,6 +9,18 @@ WebFont.load({
       .speed(500)
       .build();
 
+    const noteWidth = 1400;
+    const noteHeight = 500;
+
+    app.setBackgroundColor('#000000aa');
+    app.resize(noteWidth, noteHeight);
+    app.setPosition(
+      (document.body.clientWidth - noteWidth) / 2,
+      (document.body.clientHeight - noteHeight) / 2
+    );
+    app.setStartPos(100, 130);
+    app.setBorderRadius(15);
+
     app
       .delay(1000)
       .type('Hi', 200)
@@ -30,8 +42,10 @@ WebFont.load({
       .type(['', "It's my portfolio of HTML5"], 200)
       .move(-5, 100)
       .type('interactive ', 200)
-      .moveEnd(100)
-      .type([' without library.', 'Please enjoy this.'], 50);
+      .moveEnd(1500)
+      .type(' without library.', 300)
+      .type(['', 'Please enjoy this.'], 50)
+      .start();
   },
 });
 

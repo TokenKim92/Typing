@@ -35,9 +35,10 @@ export default class Typing extends BaseCanvas {
   #isTabAtEnd = true;
   #tailText;
   #delayTime;
+  #isProcessing = false;
 
   constructor(fontFormat, speed = 50) {
-    super(true);
+    super();
 
     this.#fontFormat = fontFormat;
     this.#speed = speed;
@@ -48,17 +49,31 @@ export default class Typing extends BaseCanvas {
 
   setStartPos(x, y) {
     this.#orgPos = { x, y };
+    this.#charPosList = [];
+    this.#charPosList.push({ ...this.#orgPos });
   }
 
-  resize() {
-    super.resize();
+  resize(width = 0, height = 0) {
+    super.resize(width, height);
 
     this.ctx.textBaseline = 'top';
     this.ctx.font = this.#fontFormat.font;
     this.ctx.fillStyle = this.#fontFormat.color;
   }
 
+  start() {
+    this.#isProcessing = true;
+  }
+
+  stop() {
+    this.#isProcessing = false;
+  }
+
   animate(curTime) {
+    if (!this.#isProcessing) {
+      return;
+    }
+
     this.#curTime = curTime;
 
     if (this.#currentMessage.msg === Typing.INIT) {
