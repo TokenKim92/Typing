@@ -56,9 +56,7 @@ export default class Typing extends BaseCanvas {
   resize(width = 0, height = 0) {
     super.resize(width, height);
 
-    this.ctx.textBaseline = 'top';
-    this.ctx.font = this.#fontFormat.font;
-    this.ctx.fillStyle = this.#fontFormat.color;
+    this.#adjustFont(this.#fontFormat);
   }
 
   start() {
@@ -301,6 +299,12 @@ export default class Typing extends BaseCanvas {
     this.clearRect(startPos.x, startPos.y - Typing.FONT_HEIGHT_OFFSET , endPos.x, endPos.y + this.#fontFormat.size + Typing.FONT_HEIGHT_OFFSET); //prettier-ignore
   }
 
+  #adjustFont(fontFormat) {
+    this.ctx.textBaseline = 'top';
+    this.ctx.font = fontFormat.font;
+    this.ctx.fillStyle = fontFormat.color;
+  }
+
   get #lastIndexInLine() {
     let i;
     for (i = this.#targetIndex; i < this.#text.length; i++) {
@@ -334,5 +338,10 @@ export default class Typing extends BaseCanvas {
 
   get #isDoneDelay() {
     return this.#delayTime < this.#curTime;
+  }
+
+  set fontFormat(fontFormat) {
+    this.#fontFormat = fontFormat;
+    this.#adjustFont(fontFormat);
   }
 }
