@@ -16,6 +16,7 @@ export default class Typing extends BaseCanvas {
 
   #currentMessage = { msg: Typing.INIT, data: null };
   #messageList = [];
+  #orgMessageList = [];
   #fontFormat;
   #speed;
   #curTime = 0;
@@ -57,6 +58,23 @@ export default class Typing extends BaseCanvas {
     super.resize(width, height);
 
     this.#adjustFont(this.#fontFormat);
+    this.init();
+  }
+
+  init() {
+    this.#currentMessage = { msg: Typing.INIT, data: null };
+    this.#messageList = [];
+    this.#orgMessageList.forEach((msg) => this.#messageList.push(msg));
+    this.#text = '';
+    this.#charPosList = [];
+    this.#charPosList.push({ ...this.#orgPos });
+    this.#curIndex = 0;
+    this.#targetIndex = 0;
+    this.#messageHandler = this.#tabToggling;
+    this.#movingDirection = 0;
+    this.#isTabAtEnd = true;
+    this.#tailText = '';
+    this.#delayTime = 0;
   }
 
   start() {
@@ -82,7 +100,6 @@ export default class Typing extends BaseCanvas {
     if (this.#isProcessMessage && this.#isMessageProcessTime) {
       this.#messageHandler(this.#currentMessage.data);
       this.#prevProcessTime = curTime;
-
       return;
     }
 
@@ -98,6 +115,7 @@ export default class Typing extends BaseCanvas {
 
   type(text, delayTime = 0) {
     this.#messageList.push({ msg: Typing.TYPE, data: text });
+    this.#orgMessageList.push({ msg: Typing.TYPE, data: text });
     delayTime && this.#messageList.push({ msg: Typing.DELAY, data: delayTime }); // prettier-ignore
 
     return this;
@@ -105,6 +123,7 @@ export default class Typing extends BaseCanvas {
 
   move(index, delayTime = 0) {
     this.#messageList.push({ msg: Typing.MOVE, data: index });
+    this.#orgMessageList.push({ msg: Typing.MOVE, data: index });
     delayTime && this.#messageList.push({ msg: Typing.DELAY, data: delayTime }); // prettier-ignore
 
     return this;
@@ -112,6 +131,7 @@ export default class Typing extends BaseCanvas {
 
   moveFront(delayTime = 0) {
     this.#messageList.push({ msg: Typing.MOVE, data: Number.MIN_SAFE_INTEGER });
+    this.#orgMessageList.push({ msg: Typing.MOVE, data: Number.MIN_SAFE_INTEGER }); // prettier-ignore
     delayTime && this.#messageList.push({ msg: Typing.DELAY, data: delayTime }); // prettier-ignore
 
     return this;
@@ -119,6 +139,7 @@ export default class Typing extends BaseCanvas {
 
   moveEnd(delayTime = 0) {
     this.#messageList.push({ msg: Typing.MOVE, data: Number.MAX_SAFE_INTEGER });
+    this.#orgMessageList.push({ msg: Typing.MOVE, data: Number.MAX_SAFE_INTEGER }); // prettier-ignore
     delayTime && this.#messageList.push({ msg: Typing.DELAY, data: delayTime }); // prettier-ignore
 
     return this;
@@ -126,6 +147,7 @@ export default class Typing extends BaseCanvas {
 
   delete(count, delayTime = 0) {
     this.#messageList.push({ msg: Typing.DELETE, data: count });
+    this.#orgMessageList.push({ msg: Typing.DELETE, data: count });
     delayTime && this.#messageList.push({ msg: Typing.DELAY, data: delayTime }); // prettier-ignore
 
     return this;
@@ -133,6 +155,7 @@ export default class Typing extends BaseCanvas {
 
   delay(time) {
     this.#messageList.push({ msg: Typing.DELAY, data: time });
+    this.#orgMessageList.push({ msg: Typing.DELAY, data: time });
 
     return this;
   }
@@ -277,6 +300,7 @@ export default class Typing extends BaseCanvas {
 
   #tabToggling() {
     const pos = this.#charPosList[this.#curIndex];
+
     this.#tapToggle ? this.#drawTap(pos) : this.#clearTap(pos);
     this.#tapToggle = !this.#tapToggle;
   }
